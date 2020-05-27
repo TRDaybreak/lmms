@@ -26,103 +26,61 @@
 #define _MIDI_IMPORT_H
 
 #include <QString>
-#include <QPair>
-#include <QVector>
 
-#include "MidiEvent.h"
 #include "ImportFilter.h"
 
+/*---------------------------------------------------------------------------*/
 
+//! MIDI importing base class
 class MidiImport : public ImportFilter
 {
 	Q_OBJECT
+
 public:
-	MidiImport( const QString & _file );
-	virtual ~MidiImport();
+	//! Build a MidiImport object from file designated by \param filename
+	MidiImport(const QString &filename);
 
-	virtual PluginView * instantiateView( QWidget * )
+	//! Necessary for lmms_plugin_main()
+	PluginView * instantiateView(QWidget *) override
 	{
-		return( NULL );
+		return nullptr;
 	}
-
 
 private:
-	virtual bool tryImport( TrackContainer* tc );
+	//! Import MIDI data from MIDI file
+	//! \param tc Container to receive MIDI tracks
+	//! \return If operation was successful
+	bool tryImport(TrackContainer *tc) override;
 
-	bool readSMF( TrackContainer* tc );
-	bool readRIFF( TrackContainer* tc );
-	bool readTrack( int _track_end, QString & _track_name );
+	//! Read file in Standard MIDI File (SMF) format
+	bool readSMF(TrackContainer &tc);
 
-	void error( void );
+	//! Read file in RIFF MIDI file format
+	bool readRIFF(TrackContainer &tc);
 
-
-	inline int readInt( int _bytes )
+	//! Read 32-bit word
+	inline uint32_t read32LE()
 	{
-		int c, value = 0;
-		do
-		{
-			c = readByte();
-			if( c == -1 )
-			{
-				return( -1 );
-			}
-			value = ( value << 8 ) | c;
-		} while( --_bytes );
-		return( value );
-	}
-	inline int read32LE()
-	{
-		int value = readByte();
+		uint32_t value = readByte();
 		value |= readByte() << 8;
 		value |= readByte() << 16;
 		value |= readByte() << 24;
 		return value;
 	}
-	inline int readVar()
-	{
-		int c = readByte();
-		int value = c & 0x7f;
-		if( c & 0x80 )
-		{
-			c = readByte();
-			value = ( value << 7 ) | ( c & 0x7f );
-			if( c & 0x80 )
-			{
-				c = readByte();
-				value = ( value << 7 ) | ( c & 0x7f );
-				if( c & 0x80 )
-				{
-					c = readByte();
-					value = ( value << 7 ) | c;
-					if( c & 0x80 )
-					{
-						return -1;
-					}
-				}
-			}
-	        }
-        	return( !file().atEnd() ? value : -1 );
-	}
 
-	inline int readID()
+	//! Read four-byte identifier
+	inline uint32_t readID()
 	{
 		return read32LE();
 	}
-	inline void skip( int _bytes )
+
+	//! Read and discard <len> bytes
+	inline void skip(int len)
 	{
-		while( _bytes > 0 )
-		{
-			readByte();
-			--_bytes;
-		}
+		for (int i = 0; i < len; ++i) { readByte(); }
 	}
+};
 
-
-	typedef QVector<QPair<int, MidiEvent> > EventVector;
-	EventVector m_events;
-	int m_timingDivision;
-
-} ;
-
+/*---------------------------------------------------------------------------*/
 
 #endif
